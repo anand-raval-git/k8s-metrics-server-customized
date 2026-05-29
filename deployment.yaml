@@ -4,13 +4,31 @@ kind: Deployment
 metadata:
   name: metrics-server
   namespace: kube-system
+  labels:
+    k8s-app: metrics-server
 spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
   strategy:
     rollingUpdate:
       maxUnavailable: 0
   template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
     spec:
       serviceAccountName: metrics-server
+      hostAliases:
+      - ip: 172.31.30.93
+        hostnames:
+        - "k8-master-node"
+      - ip: 172.31.8.80
+        hostnames:
+        - "k8s-worker-node1-class"
+      - ip: 172.31.6.45
+        hostnames:
+        - "k8s-worker-node2-class"
       volumes:
       # mount in tmp so we can safely use from-scratch images and/or read-only containers
       - name: tmp-dir
@@ -18,21 +36,22 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: metrics-server
-        image: gcr.io/k8s-staging-metrics-server/metrics-server:master
+        image: gcr.io/k8s-staging-metrics-server/metrics-server:v0.7.2
         imagePullPolicy: IfNotPresent
         args:
           - --cert-dir=/tmp
-          - --secure-port=10250
+          - --secure-port=4443
           - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
           - --kubelet-use-node-status-port
           - --metric-resolution=15s
+          - --kubelet-insecure-tls
         resources:
           requests:
             cpu: 100m
             memory: 200Mi
         ports:
         - name: https
-          containerPort: 10250
+          containerPort: 4443
           protocol: TCP
         readinessProbe:
           httpGet:
@@ -64,3 +83,4 @@ spec:
           mountPath: /tmp
       nodeSelector:
         kubernetes.io/os: linux
+      hostNetwork: true
